@@ -1,102 +1,79 @@
-
-const   express = require('express');
-const app = express();
+const express = require('express');
 const axios = require('axios');
-const jwt = require('jsonwebtoken');
-const JWT_TOKEN = process.env.JWT_TOKEN
 
-
+const app = express();
 const PORT = process.env.PORT || 9876;
-
-
-app.use(express.json());
-
+const JWT_TOKEN = process.env.JWT_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiZXhwIjoxNzQyNDgxMDM3LCJpYXQiOjE3NDI0ODA3MzcsImlzcyI6IkFmZm9yZG1lZCIsImp0aSI6IjI4N2Y4MGVkLTc3OWYtNDJiOS1hZjc0LTNmYmRiMzEwYzMzZCIsInN1YiI6Inlhc3dhbnRoc2FpX3ZhbGx1cnVAc3JtYXAuZWR1LmluIn0sImNvbXBhbnlOYW1lIjoiU1JNIFVuaXZlcnNpdHktQVAiLCJjbGllbnRJRCI6IjI4N2Y4MGVkLTc3OWYtNDJiOS1hZjc0LTNmYmRiMzEwYzMzZCIsImNsaWVudFNlY3JldCI6IkxWRnp1TEhJZ0xVcUFleEMiLCJvd25lck5hbWUiOiJZYXN3YW50aCBTYWkgVmFsbHVydSIsIm93bmVyRW1haWwiOiJ5YXN3YW50aHNhaV92YWxsdXJ1QHNybWFwLmVkdS5pbiIsInJvbGxObyI6IkFQMjIxMTAwMTEwOTgifQ.S37pvOdWbJGg8pvc2ShlrWAvT-6rTU2bfe58C5bpNME';
 
 const WINDOW_SIZE = 10;
-const TIMEOUT = 500; 
-const TEST_SERVER_BASE_URL = 'http://20.244.56.144/test'; 
+const TIMEOUT = 500;
+const TEST_SERVER_BASE_URL = 'http://20.244.56.144/test';
 
-const numberWindows = {
-  p: [], // prime
-  f: [], // fibonacci
-  e: [], // even
-  r: []  // random numbers
-};
 const number_map = {
-    p: 'primes',
-    f: 'fibo',
-    e: 'even',
-    r: 'rand'
-}
+  p: 'primes',
+  f: 'fibo',
+  e: 'even',
+  r: 'rand'
+};
 
-// fetching numbers from third party server
-async function fetchNumbersFromTestServer(numberId) {
+
+const numberWindow = new Set();
+
+
+async function fetchNumbers(numberId) {
+  if (!JWT_TOKEN) {
+    console.error("JWT_TOKEN is not set.");
+    return [];
+  }
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
 
-    
-    
-    const response = await axios.get(`${TEST_SERVER_URL}/${number_map[numberId]}`, {
-        headers: {
-          'Authorization': `Bearer ${JWT_TOKEN}`
-        },
-        signal: controller.signal
-      });
-  
-      clearTimeout(timeoutId);
-      return response.data.numbers;
-    } catch (error) {
-      console.error(`Error fetching ${type} numbers:`, error.message);
-      return [];
-    }
-  };
-  
-
-
-app.get('/numbers/:numberID', async (req, res) => {
-  const { numberId } = req.params;
-  
-
-  
-  try {
-    
-    const prevState = [...numberWindows[numberId]];
-    
-    
-    const result = await fetchNumbersFromTestServer(numberId);
-    const numbers = result.numbers || [];
-    
-    
-    if (numbers.length > 0) {
-      
-      for (const num of numbers) {
-        if (!numberWindows[numberId].includes(num)) {
-          if (numberWindows[numberId].length >= WINDOW_SIZE) {
-            numberWindows[numberId].shift(); 
-          }
-          numberWindows[numberId].push(num);
-        }
-      }
-    }
-    
-    
-    const avg = numberWindows[numberId].length > 0 
-      ? parseFloat((numberWindows[numberId].reduce((a, b) => a + b, 0) / numberWindows[numberId].length).toFixed(2))
-      : 0;
-    
-    
-    res.json({
-      windowPrevState: prevState,
-      windowCurrState: numberWindows[numberId],
-      numbers: numbers,
-      avg: avg
+    const response = await axios.get(`${TEST_SERVER_BASE_URL}/${number_map[numberId]}`, {
+      headers: { 'Authorization': `Bearer ${JWT_TOKEN}` },
+      signal: controller.signal
     });
-    
+
+    clearTimeout(timeoutId);
+    return response.data.numbers || [];
   } catch (error) {
-    console.error('processing error:', error.message);
-    res.status(500).json({ error: 'server error' });
+    console.error(`Error fetching ${number_map[numberId]} numbers:`, error.message);
+    return [];
   }
+}
+
+// API Endpoint
+app.get('/numbers/:numberId', async (req, res) => {
+  const { numberId } = req.params;
+
+  if (!number_map[numberId]) {
+    return res.status(400).json({ error: "Invalid numberId. Allowed values: p, f, e, r" });
+  }
+
+  const prevState = Array.from(numberWindow);
+  const newNumbers = await fetchNumbers(numberId);
+
+  for (const num of newNumbers) {
+    if (!numberWindow.has(num)) {
+      if (numberWindow.size >= WINDOW_SIZE) {
+        numberWindow.delete([...numberWindow][0]); // Remove the  oldest number
+      }
+      numberWindow.add(num);
+    }
+  }
+
+  const currState = Array.from(numberWindow);
+  const avg = currState.length > 0 
+    ? parseFloat((currState.reduce((sum, val) => sum + val, 0) / currState.length).toFixed(2))
+    : 0;
+
+  res.json({
+    windowPrevState: prevState,
+    windowCurrState: currState,
+    numbers: newNumbers,
+    avg: avg
+  });
 });
 
 app.listen(PORT, () => {
