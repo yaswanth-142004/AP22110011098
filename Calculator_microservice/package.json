@@ -1,0 +1,24 @@
+{
+  "name": "calculator_microservice",
+  "version": "1.0.0",
+  "description": "Average Calculator micro service that exposes a REST API",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yaswanth-142004/AP22110011098.git"
+  },
+  "author": "AP22110011098",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yaswanth-142004/AP22110011098/issues"
+  },
+  "homepage": "https://github.com/yaswanth-142004/AP22110011098#readme",
+  "dependencies": {
+    "axios": "^1.8.4",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
